@@ -35,6 +35,8 @@ spec:
               value: ey_data_engineering
             - name: BQ_TABLE
               value: processed_events
+            - name: RAW_ARCHIVE_BUCKET
+              value: PROJECT_ID-ey-raw-event-archive
             - name: PSEUDONYM_SALT
               valueFrom:
                 secretKeyRef:

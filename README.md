@@ -16,13 +16,76 @@ See [`docs/use_cases.md`](docs/use_cases.md) for detailed use-case definitions, 
 
 ## Architecture
 
+
+```mermaid
+flowchart LR
+  subgraph Sources[Sources and scheduling]
+    APP[Client apps / POS / mobility systems]
+    RUN[Cloud Run loaders]
+    SCH[Cloud Scheduler]
+    GCSRAW[Cloud Storage raw files]
+  end
+
+  subgraph Ingest[Ingestion and inspection]
+    PUB[Pub/Sub topic]
+    DLQ[Pub/Sub dead-letter topic]
+    DLP[Cloud DLP inspect template]
+    DF[Dataflow optional enrichment]
+  end
+
+  subgraph Process[Processing and orchestration]
+    GKE[GKE worker pods]
+    SM[Secret Manager pseudonym salt]
+    KMS[Cloud KMS CMEK]
+    AR[Artifact Registry image]
+  end
+
+  subgraph Data[Governed storage and analytics]
+    ARCH[Cloud Storage raw archive]
+    BQ[BigQuery partitioned table]
+    DP[Dataplex / Data Catalog]
+  end
+
+  subgraph Ops[Security and operations]
+    IAM[IAM least privilege]
+    LOG[Cloud Logging]
+    MON[Cloud Monitoring alerts]
+    AUD[Cloud Audit Logs / Error Reporting / Trace]
+  end
+
+  APP --> PUB
+  RUN --> PUB
+  SCH --> RUN
+  GCSRAW --> DF
+  PUB --> DLP
+  PUB --> GKE
+  PUB --> DLQ
+  DLP --> DF
+  DF --> BQ
+  AR --> GKE
+  SM --> GKE
+  KMS --> PUB
+  KMS --> ARCH
+  KMS --> BQ
+  GKE --> ARCH
+  GKE --> BQ
+  ARCH --> DP
+  BQ --> DP
+  GKE --> LOG
+  LOG --> MON
+  IAM --> GKE
+  AUD --> MON
+```
+
+The solution now uses a broader GCP service map for production demos: Cloud Storage for raw landing and audit archive, Cloud DLP for sensitive-data inspection, Pub/Sub for streaming ingestion, Dataflow as an optional managed streaming enrichment tier, GKE for the Python worker, BigQuery for governed analytics, Dataplex/Data Catalog for discovery and governance, Cloud Composer and Cloud Scheduler for orchestration, Cloud KMS and Secret Manager for security, Artifact Registry for images, and Cloud Logging, Monitoring, Trace, Error Reporting, and Audit Logs for observability.
+
 The solution implements this flow:
 
-1. Upstream applications or data loaders publish JSON events to a Pub/Sub topic.
-2. A Python microservice running on GKE consumes messages from the subscription.
-3. The service validates and normalises records, hashes identifiers with SHA-256, drops non-required fields, and adds processing metadata.
-4. Cleansed records are written to partitioned BigQuery tables.
-5. Cloud Logging and Monitoring provide auditability, operational health, and alerting hooks.
+1. Cloud Scheduler, Cloud Run loaders, client applications, or batch uploads publish JSON events to Pub/Sub and optionally land raw files in Cloud Storage.
+2. Cloud DLP can inspect payloads before curation, and Dataflow can be enabled for high-volume streaming enrichment when managed autoscaling is preferred.
+3. A Python microservice running on GKE consumes messages from the subscription, validates and normalises records, hashes identifiers with SHA-256, drops non-required fields, and adds processing metadata.
+4. Raw messages can be archived to Cloud Storage, while cleansed records are written to partitioned BigQuery tables.
+5. Dataplex/Data Catalog document the data estate, and Cloud Logging, Monitoring, Trace, Error Reporting, and Audit Logs provide accountability and operational health.
 
 Detailed architecture notes are in [`docs/architecture.md`](docs/architecture.md).
 
@@ -104,6 +167,7 @@ The worker reads configuration from environment variables:
 | `BQ_DATASET` | BigQuery dataset | `ey_data_engineering` |
 | `BQ_TABLE` | BigQuery destination table | `processed_events` |
 | `PSEUDONYM_SALT` | Secret salt used before SHA-256 hashing | Empty string for local demo only |
+| `RAW_ARCHIVE_BUCKET` | Optional Cloud Storage bucket for encrypted raw-message audit archive | Disabled |
 
 In production, inject `PSEUDONYM_SALT` from Secret Manager rather than storing it in code or Kubernetes manifests.
 
@@ -114,3 +178,7 @@ In production, inject `PSEUDONYM_SALT` from Secret Manager rather than storing i
 * **Retention:** Terraform configures partition expiration on BigQuery tables.
 * **Least privilege:** Workload identity is designed around Pub/Sub subscriber and BigQuery data editor roles only.
 * **Accountability:** Structured logs capture event type, processing status, and error context without logging raw personal data.
+
+### Architecture diagram notes
+
+The README architecture is rendered as Mermaid text so the repository remains source-only and avoids unsupported binary image files. The diagram represents the major GCP service layers used by this repository: sources and schedulers, ingestion and inspection, transformation and orchestration, governed storage and analytics, and security/operations services.

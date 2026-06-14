@@ -16,10 +16,11 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional
 
 try:
-    from google.cloud import bigquery, pubsub_v1
+    from google.cloud import bigquery, pubsub_v1, storage
 except ImportError:  # pragma: no cover - optional for local unit tests
     bigquery = None
     pubsub_v1 = None
+    storage = None
 
 LOGGER = logging.getLogger("ey_data_pipeline")
 DEFAULT_DATASET = "ey_data_engineering"
@@ -120,6 +121,19 @@ def transform_event(event: Dict[str, Any], salt: str = "") -> Dict[str, Any]:
     return transformed
 
 
+def archive_raw_message(event: Dict[str, Any], bucket_name: str, event_id: str) -> None:
+    """Archive the raw source event to Cloud Storage for controlled audit replay."""
+
+    if not bucket_name:
+        return
+    if storage is None:
+        raise RuntimeError("google-cloud-storage is not installed")
+    client = storage.Client()
+    bucket = client.bucket(bucket_name)
+    blob = bucket.blob(f"raw-events/{event_id}.json")
+    blob.upload_from_string(json.dumps(event, sort_keys=True), content_type="application/json")
+
+
 def insert_rows(rows: Iterable[Dict[str, Any]], project_id: str, dataset: str, table: str) -> None:
     """Insert transformed rows into BigQuery."""
 
@@ -132,12 +146,20 @@ def insert_rows(rows: Iterable[Dict[str, Any]], project_id: str, dataset: str, t
         raise RuntimeError(f"BigQuery insert failed: {errors}")
 
 
-def handle_message(message: Any, project_id: str, dataset: str, table: str, salt: str) -> None:
+def handle_message(
+    message: Any,
+    project_id: str,
+    dataset: str,
+    table: str,
+    salt: str,
+    archive_bucket: str = "",
+) -> None:
     """Pub/Sub callback that transforms one message and acknowledges it on success."""
 
     try:
         payload = json.loads(message.data.decode("utf-8"))
         row = transform_event(payload, salt=salt)
+        archive_raw_message(payload, archive_bucket, row["event_id"])
         insert_rows([row], project_id=project_id, dataset=dataset, table=table)
         LOGGER.info("processed event_id=%s use_case=%s", row["event_id"], row["use_case"])
         message.ack()
@@ -156,12 +178,13 @@ def run_worker() -> None:
     dataset = os.getenv("BQ_DATASET", DEFAULT_DATASET)
     table = os.getenv("BQ_TABLE", DEFAULT_TABLE)
     salt = os.getenv("PSEUDONYM_SALT", "")
+    archive_bucket = os.getenv("RAW_ARCHIVE_BUCKET", "")
 
     subscriber = pubsub_v1.SubscriberClient()
     subscription_path = subscription if subscription.startswith("projects/") else subscriber.subscription_path(project_id, subscription)
     future = subscriber.subscribe(
         subscription_path,
-        callback=lambda message: handle_message(message, project_id, dataset, table, salt),
+        callback=lambda message: handle_message(message, project_id, dataset, table, salt, archive_bucket),
     )
     LOGGER.info("listening for messages on %s", subscription_path)
     future.result()
