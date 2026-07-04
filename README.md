@@ -37,6 +37,32 @@ Dataplex/Data Catalog document the curated BigQuery and raw archive zones.
 
 
 
+```mermaid
+flowchart TD
+  A[Customer and Kaggle data sources] --> B[Pub/Sub ingestion]
+  B --> C[Cloud DLP inspection]
+  B --> D[GKE backend workers]
+  B --> E[Pub/Sub dead-letter topic]
+  C --> F[Optional Dataflow enrichment]
+  F --> G[BigQuery curated tables]
+  D --> H[Cloud Storage raw evidence archive]
+  D --> G
+  I[Secret Manager pseudonym salt] --> D
+  J[Cloud KMS CMEK] --> B
+  J --> G
+  J --> H
+  K[Artifact Registry images] --> D
+  G --> L[Dataplex and Data Catalog]
+  H --> L
+  D --> M[Cloud Logging]
+  M --> N[Cloud Monitoring alerts]
+  O[IAM least privilege] --> D
+  P[Retention policies] --> G
+  P --> H
+```
+
+
+
 ## Platform UI
 
 The UI is a Cloud Run-ready portal for data engineers. It shows platform health, use-case KPIs, detected issue queues, governance controls, and an end-to-end pipeline builder for source selection, ingestion, governance, transformation, and analytics.
@@ -53,6 +79,100 @@ The UI is a Cloud Run-ready portal for data engineers. It shows platform health,
 4. Review `quality_flags`, issue severity, raw evidence archive status, and BigQuery output table.
 5. Use the controls panel to confirm IAM, Logging, Monitoring, Retention, KMS, and DLP coverage.
 6. Copy the deployed Cloud Run URL into demos, documentation, or stakeholder walkthroughs.
+
+# GCP End-to-End Data Engineering
+
+This repository demonstrates a production-style, end-to-end data engineering pattern on Google Cloud Platform (GCP) for EY-relevant analytics workloads. It combines Terraform-managed cloud infrastructure, Pub/Sub ingestion, a Python worker on Google Kubernetes Engine (GKE), BigQuery storage, and governance controls such as pseudonymisation, retention, logging, and least-privilege IAM.
+
+
+| Use case | Public data source | EY business outcome |
+| --- | --- | --- |
+| **Mobility expense assurance** | NYC Taxi & Limousine Commission trip records | Detect unusual fares, route-cost outliers, and policy exceptions in employee travel or mobility spend. |
+| **ESG transport emissions reporting** | NYC TLC trip distance and vehicle-service metadata | Estimate trip-level CO2e and aggregate emissions for sustainability reporting. |
+| **Retail transaction privacy pipeline** | Retail/POS-style JSON events | Ingest customer transactions while applying GDPR-aligned minimisation and pseudonymisation. |
+
+See [`docs/use_cases.md`](docs/use_cases.md) for detailed use-case definitions, event contracts, and BigQuery analytics examples.
+
+## Architecture
+
+
+```mermaid
+flowchart LR
+  subgraph Sources[Sources and scheduling]
+    APP[Client apps / POS / mobility systems]
+    RUN[Cloud Run loaders]
+    SCH[Cloud Scheduler]
+    GCSRAW[Cloud Storage raw files]
+  end
+
+  subgraph Ingest[Ingestion and inspection]
+    PUB[Pub/Sub topic]
+    DLQ[Pub/Sub dead-letter topic]
+    DLP[Cloud DLP inspect template]
+    DF[Dataflow optional enrichment]
+  end
+
+  subgraph Process[Backend processing]
+    GKE[GKE worker pods]
+    SM[Secret Manager pseudonym salt]
+    KMS[Cloud KMS CMEK]
+    AR[Artifact Registry images]
+  end
+
+  subgraph Data[Governed storage and analytics]
+    ARCH[Cloud Storage raw evidence archive]
+    BQ[BigQuery partitioned curated table]
+    DP[Dataplex / Data Catalog]
+  end
+
+  subgraph Ops[IAM, logging, monitoring and retention]
+  subgraph Process[Processing and orchestration]
+    GKE[GKE worker pods]
+    SM[Secret Manager pseudonym salt]
+    KMS[Cloud KMS CMEK]
+    AR[Artifact Registry image]
+  end
+
+  subgraph Data[Governed storage and analytics]
+    ARCH[Cloud Storage raw archive]
+    BQ[BigQuery partitioned table]
+    DP[Dataplex / Data Catalog]
+  end
+
+  subgraph Ops[Security and operations]
+    IAM[IAM least privilege]
+    LOG[Cloud Logging]
+    MON[Cloud Monitoring alerts]
+    AUD[Cloud Audit Logs / Error Reporting / Trace]
+    RET[BigQuery and GCS retention]
+  end
+
+  APP --> PUB
+  KAG --> PUB
+  RUN --> PUB
+  SCH --> RUN
+  GCSRAW --> DF
+  PUB --> DLP
+  PUB --> GKE
+  PUB --> DLQ
+  DLP --> DF
+  DF --> BQ
+  AR --> GKE
+  SM --> GKE
+  KMS --> PUB
+  KMS --> ARCH
+  KMS --> BQ
+  GKE --> ARCH
+  GKE --> BQ
+  ARCH --> DP
+  BQ --> DP
+  GKE --> LOG
+  LOG --> MON
+  IAM --> GKE
+  AUD --> MON
+  RET --> ARCH
+  RET --> BQ
+```
 
 ## How the backend detects issues
 

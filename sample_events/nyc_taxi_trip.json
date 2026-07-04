@@ -10,4 +10,7 @@
   "total_amount": 82.76,
   "trip_distance": 3.2,
   "source_dataset": "kaggle_nyc_yellow_taxi_trip_data"
+  "total_amount": 26.76,
+  "trip_distance": 3.2,
+  "source_system": "nyc_tlc_trip_records"
 }
