@@ -59,13 +59,10 @@ The UI is a Cloud Run-ready portal for data engineers. It shows platform health,
 5. Use the controls panel to confirm IAM, Logging, Monitoring, Retention, KMS, and DLP coverage.
 6. Copy the deployed Cloud Run URL into demos, documentation, or stakeholder walkthroughs.
 
-# GCP End-to-End Data Engineering for EY Use Cases
+# GCP End-to-End Data Engineering
 
 This repository demonstrates a production-style, end-to-end data engineering pattern on Google Cloud Platform (GCP) for EY-relevant analytics workloads. It combines Terraform-managed cloud infrastructure, Pub/Sub ingestion, a Python worker on Google Kubernetes Engine (GKE), BigQuery storage, and governance controls such as pseudonymisation, retention, logging, and least-privilege IAM.
 
-## Why this matters for EY
-
-EY teams commonly help clients modernise data platforms while preserving auditability, privacy, and operational resilience. This project applies the architecture to practical use cases that can be demonstrated with public real-world datasets and adapted to client data later:
 
 | Use case | Public data source | EY business outcome |
 | --- | --- | --- |
