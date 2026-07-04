@@ -23,6 +23,7 @@ variable "cluster_name" {
   description = "GKE cluster name."
   type        = string
   default     = "verdatrace-data-engineering-gke"
+  default     = "ey-data-engineering-gke"
 }
 
 locals {
@@ -59,17 +60,20 @@ resource "google_project_service" "enabled" {
 
 resource "google_kms_key_ring" "data_platform" {
   name     = "verdatrace-data-platform"
+  name     = "ey-data-platform"
   location = var.region
 }
 
 resource "google_kms_crypto_key" "data_encryption" {
   name            = "verdatrace-data-encryption"
+  name            = "ey-data-encryption"
   key_ring        = google_kms_key_ring.data_platform.id
   rotation_period = "7776000s"
 }
 
 resource "google_storage_bucket" "raw_archive" {
   name                        = "${var.project_id}-verdatrace-raw-event-archive"
+  name                        = "${var.project_id}-ey-raw-event-archive"
   location                    = "EU"
   uniform_bucket_level_access = true
 
@@ -85,17 +89,20 @@ resource "google_storage_bucket" "raw_archive" {
 
 resource "google_pubsub_topic" "transaction_events" {
   name = "verdatrace-transaction-events"
+  name = "ey-transaction-events"
 
   kms_key_name = google_kms_crypto_key.data_encryption.id
 }
 
 resource "google_pubsub_topic" "dead_letter" {
   name         = "verdatrace-transaction-events-dlq"
+  name         = "ey-transaction-events-dlq"
   kms_key_name = google_kms_crypto_key.data_encryption.id
 }
 
 resource "google_pubsub_subscription" "transaction_worker" {
   name                       = "verdatrace-transaction-worker"
+  name                       = "ey-transaction-worker"
   topic                      = google_pubsub_topic.transaction_events.id
   ack_deadline_seconds       = 60
   message_retention_duration = "604800s"
@@ -108,6 +115,7 @@ resource "google_pubsub_subscription" "transaction_worker" {
 
 resource "google_bigquery_dataset" "analytics" {
   dataset_id                 = "verdatrace_data_engineering"
+  dataset_id                 = "ey_data_engineering"
   location                   = "EU"
   delete_contents_on_destroy = false
 
@@ -147,6 +155,8 @@ resource "google_data_loss_prevention_inspect_template" "pii" {
   parent       = "projects/${var.project_id}/locations/${var.region}"
   description  = "Inspect incoming VerdaTrace demo payloads for common PII before analytics curation."
   display_name = "verdatrace-pii-inspection"
+  description  = "Inspect incoming EY demo payloads for common PII before analytics curation."
+  display_name = "ey-pii-inspection"
 
   inspect_config {
     info_types { name = "EMAIL_ADDRESS" }
@@ -160,12 +170,16 @@ resource "google_artifact_registry_repository" "containers" {
   location      = var.region
   repository_id = "verdatrace-data-platform"
   description   = "Container images for VerdaTrace data engineering workloads"
+  repository_id = "ey-data-platform"
+  description   = "Container images for EY data engineering workloads"
   format        = "DOCKER"
 }
 
 resource "google_service_account" "pipeline" {
   account_id   = "verdatrace-data-pipeline"
   display_name = "VerdaTrace data pipeline worker"
+  account_id   = "ey-data-pipeline"
+  display_name = "EY data pipeline worker"
 }
 
 resource "google_project_iam_member" "pipeline_pubsub" {
@@ -194,6 +208,7 @@ resource "google_project_iam_member" "pipeline_kms" {
 
 resource "google_secret_manager_secret" "pseudonym_salt" {
   secret_id = "verdatrace-pseudonym-salt"
+  secret_id = "ey-pseudonym-salt"
   replication {
     user_managed {
       replicas { location = var.region }
@@ -227,6 +242,8 @@ resource "google_container_node_pool" "workers" {
 resource "google_logging_metric" "pipeline_errors" {
   name   = "verdatrace_pipeline_error_count"
   filter = "resource.type=\"k8s_container\" AND severity>=ERROR AND labels.k8s-pod/app=\"verdatrace-data-pipeline\""
+  name   = "ey_pipeline_error_count"
+  filter = "resource.type=\"k8s_container\" AND severity>=ERROR AND labels.k8s-pod/app=\"ey-data-pipeline\""
 
   metric_descriptor {
     metric_kind = "DELTA"
@@ -236,6 +253,7 @@ resource "google_logging_metric" "pipeline_errors" {
 
 resource "google_monitoring_alert_policy" "pipeline_errors" {
   display_name = "VerdaTrace data pipeline processing errors"
+  display_name = "EY data pipeline processing errors"
   combiner     = "OR"
 
   conditions {

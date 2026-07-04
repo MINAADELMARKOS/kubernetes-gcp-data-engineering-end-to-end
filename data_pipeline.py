@@ -1,4 +1,5 @@
 """Pub/Sub to BigQuery worker for VerdaTrace-aligned data engineering use cases.
+"""Pub/Sub to BigQuery worker for EY-aligned data engineering use cases.
 
 The module is intentionally split into pure transformation functions and cloud I/O
 functions so that use-case rules can be tested locally without GCP credentials.
@@ -29,6 +30,10 @@ DEFAULT_TABLE = "processed_events"
 DEFAULT_EMISSIONS_FACTOR_KG_PER_MILE = 0.404
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PHONE_PATTERN = re.compile(r"\+?\d[\d .()\-]{7,}\d")
+LOGGER = logging.getLogger("ey_data_pipeline")
+DEFAULT_DATASET = "ey_data_engineering"
+DEFAULT_TABLE = "processed_events"
+DEFAULT_EMISSIONS_FACTOR_KG_PER_MILE = 0.404
 
 
 class TransformationError(ValueError):
@@ -88,6 +93,11 @@ def build_quality_flags(
     if total_amount is None:
         flags.append("missing_amount")
     elif total_amount < 0:
+def build_quality_flags(total_amount: Optional[float], trip_distance: Optional[float]) -> List[str]:
+    """Return lightweight data-quality flags for audit and assurance queries."""
+
+    flags: List[str] = []
+    if total_amount is not None and total_amount < 0:
         flags.append("negative_amount")
     if trip_distance is not None and trip_distance < 0:
         flags.append("negative_distance")
@@ -109,6 +119,7 @@ def build_quality_flags(
             break
     if event.get("duplicate_hint") is True:
         flags.append("possible_duplicate_event")
+            flags.append("high_amount_per_mile")
     return flags
 
 
@@ -127,6 +138,7 @@ def transform_event(event: Dict[str, Any], salt: str = "") -> Dict[str, Any]:
         co2e_kg = round(trip_distance * DEFAULT_EMISSIONS_FACTOR_KG_PER_MILE, 6)
 
     flags = build_quality_flags(event, total_amount, trip_distance, co2e_kg)
+    flags = build_quality_flags(total_amount, trip_distance)
     transformed = {
         "event_id": str(event.get("event_id") or event.get("transaction_id") or event.get("trip_id") or ""),
         "use_case": use_case,
@@ -139,6 +151,7 @@ def transform_event(event: Dict[str, Any], salt: str = "") -> Dict[str, Any]:
         "trip_distance_miles": trip_distance,
         "co2e_kg": co2e_kg,
         "source_system": str(event.get("source_system") or event.get("source_dataset") or "unknown"),
+        "source_system": str(event.get("source_system") or "unknown"),
         "quality_flags": ",".join(flags),
     }
     if not transformed["event_id"]:
@@ -219,6 +232,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     """CLI entrypoint for local samples and cloud worker mode."""
 
     parser = argparse.ArgumentParser(description="VerdaTrace Data Platform pipeline worker")
+    parser = argparse.ArgumentParser(description="EY GCP data engineering pipeline")
     parser.add_argument("--local-sample", help="Path to a JSON event to transform locally")
     parser.add_argument("--salt", default=os.getenv("PSEUDONYM_SALT", "local-demo-salt"))
     args = parser.parse_args(argv)

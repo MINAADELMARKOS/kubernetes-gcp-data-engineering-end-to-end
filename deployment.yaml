@@ -4,6 +4,9 @@ metadata:
   name: verdatrace-data-pipeline
   annotations:
     iam.gke.io/gcp-service-account: verdatrace-data-pipeline@PROJECT_ID.iam.gserviceaccount.com
+  name: ey-data-pipeline
+  annotations:
+    iam.gke.io/gcp-service-account: ey-data-pipeline@PROJECT_ID.iam.gserviceaccount.com
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -11,6 +14,9 @@ metadata:
   name: verdatrace-data-pipeline
   labels:
     app: verdatrace-data-pipeline
+  name: ey-data-pipeline
+  labels:
+    app: ey-data-pipeline
 spec:
   replicas: 2
   selector:
@@ -25,6 +31,16 @@ spec:
       containers:
         - name: worker
           image: gcr.io/PROJECT_ID/verdatrace-data-pipeline:latest
+      app: ey-data-pipeline
+  template:
+    metadata:
+      labels:
+        app: ey-data-pipeline
+    spec:
+      serviceAccountName: ey-data-pipeline
+      containers:
+        - name: worker
+          image: gcr.io/PROJECT_ID/ey-gcp-data-pipeline:latest
           imagePullPolicy: Always
           env:
             - name: GCP_PROJECT
@@ -41,6 +57,17 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: verdatrace-pseudonym-salt
+              value: ey-transaction-worker
+            - name: BQ_DATASET
+              value: ey_data_engineering
+            - name: BQ_TABLE
+              value: processed_events
+            - name: RAW_ARCHIVE_BUCKET
+              value: PROJECT_ID-ey-raw-event-archive
+            - name: PSEUDONYM_SALT
+              valueFrom:
+                secretKeyRef:
+                  name: ey-pseudonym-salt
                   key: latest
           resources:
             requests:

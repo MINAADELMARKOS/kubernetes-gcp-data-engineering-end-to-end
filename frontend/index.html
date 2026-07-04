@@ -53,6 +53,12 @@
     .tab { padding: 10px 12px; border-radius: 12px; background: #eef7f3; font-weight: 800; }
     footer { text-align: center; padding: 28px; color: var(--muted); }
     @media (max-width: 900px) { .hero, .grid, .pipeline { grid-template-columns: 1fr; } .wide { grid-column: span 1; } nav { align-items: flex-start; flex-direction: column; } }
+    body { font-family: Arial, sans-serif; margin: 0; color: #123; background: #f6faf8; }
+    header { background: linear-gradient(135deg, #0b6b57, #174ea6); color: white; padding: 48px; }
+    main { padding: 32px; max-width: 1180px; margin: auto; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+    .card { background: white; border-radius: 14px; padding: 20px; box-shadow: 0 6px 20px #0001; }
+    pre { background: #eef3f0; border-radius: 8px; padding: 8px; overflow-x: auto; }
   </style>
 </head>
 <body>
@@ -136,5 +142,30 @@ gcloud run deploy verdatrace-portal --source frontend --region europe-west2 --al
   </section>
 </main>
 <footer>VerdaTrace Data Platform — trusted ingestion, privacy-preserving transformation, ESG reporting, expense assurance and operational auditability.</footer>
+  <h1>VerdaTrace Data Platform</h1>
+  <p>VerdaTrace — A GCP-native platform for trusted, governed, and sustainable data pipelines.</p>
+  <p id="service-url">Cloud Run URL: replace after deployment with https://SERVICE-REGION-PROJECT.run.app</p>
+</header>
+<main>
+  <section class="grid">
+    <div class="card"><h2>Ingest</h2><p>Upload customer files, publish streaming events, or run Kaggle demo loaders through Pub/Sub and Cloud Storage.</p></div>
+    <div class="card"><h2>Govern</h2><p>Apply IAM, Cloud DLP inspection, Secret Manager salts, KMS encryption, BigQuery retention and Dataplex metadata.</p></div>
+    <div class="card"><h2>Detect</h2><p>Flag high fare-per-mile mobility spend, high transport emissions, duplicate records and raw direct identifiers.</p></div>
+    <div class="card"><h2>Operate</h2><p>Use Cloud Logging, Monitoring alerts, audit logs and dead-letter topics to run the platform with production controls.</p></div>
+  </section>
+  <section class="card">
+    <h2>Platform capabilities</h2>
+    <ul>
+      <li>Mobility expense assurance: detects suspicious trip costs and tip ratios.</li>
+      <li>ESG transport emissions: estimates CO2e and flags high-emission activity.</li>
+      <li>Retail privacy pipeline: pseudonymises customer IDs and flags direct identifiers before analytics use.</li>
+      <li>Backend processing: GKE worker consumes Pub/Sub and writes curated BigQuery records.</li>
+    </ul>
+  </section>
+  <section class="card">
+    <h2>Demo command</h2>
+    <pre>gcloud run deploy verdatrace-portal --source frontend --region europe-west2 --allow-unauthenticated</pre>
+  </section>
+</main>
 </body>
 </html>

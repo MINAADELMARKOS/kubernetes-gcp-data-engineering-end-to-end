@@ -59,6 +59,103 @@ The UI is a Cloud Run-ready portal for data engineers. It shows platform health,
 5. Use the controls panel to confirm IAM, Logging, Monitoring, Retention, KMS, and DLP coverage.
 6. Copy the deployed Cloud Run URL into demos, documentation, or stakeholder walkthroughs.
 
+# GCP End-to-End Data Engineering for EY Use Cases
+
+This repository demonstrates a production-style, end-to-end data engineering pattern on Google Cloud Platform (GCP) for EY-relevant analytics workloads. It combines Terraform-managed cloud infrastructure, Pub/Sub ingestion, a Python worker on Google Kubernetes Engine (GKE), BigQuery storage, and governance controls such as pseudonymisation, retention, logging, and least-privilege IAM.
+
+## Why this matters for EY
+
+EY teams commonly help clients modernise data platforms while preserving auditability, privacy, and operational resilience. This project applies the architecture to practical use cases that can be demonstrated with public real-world datasets and adapted to client data later:
+
+| Use case | Public data source | EY business outcome |
+| --- | --- | --- |
+| **Mobility expense assurance** | NYC Taxi & Limousine Commission trip records | Detect unusual fares, route-cost outliers, and policy exceptions in employee travel or mobility spend. |
+| **ESG transport emissions reporting** | NYC TLC trip distance and vehicle-service metadata | Estimate trip-level CO2e and aggregate emissions for sustainability reporting. |
+| **Retail transaction privacy pipeline** | Retail/POS-style JSON events | Ingest customer transactions while applying GDPR-aligned minimisation and pseudonymisation. |
+
+See [`docs/use_cases.md`](docs/use_cases.md) for detailed use-case definitions, event contracts, and BigQuery analytics examples.
+
+## Architecture
+
+
+```mermaid
+flowchart LR
+  subgraph Sources[Sources and scheduling]
+    APP[Client apps / POS / mobility systems]
+    RUN[Cloud Run loaders]
+    SCH[Cloud Scheduler]
+    GCSRAW[Cloud Storage raw files]
+  end
+
+  subgraph Ingest[Ingestion and inspection]
+    PUB[Pub/Sub topic]
+    DLQ[Pub/Sub dead-letter topic]
+    DLP[Cloud DLP inspect template]
+    DF[Dataflow optional enrichment]
+  end
+
+  subgraph Process[Backend processing]
+    GKE[GKE worker pods]
+    SM[Secret Manager pseudonym salt]
+    KMS[Cloud KMS CMEK]
+    AR[Artifact Registry images]
+  end
+
+  subgraph Data[Governed storage and analytics]
+    ARCH[Cloud Storage raw evidence archive]
+    BQ[BigQuery partitioned curated table]
+    DP[Dataplex / Data Catalog]
+  end
+
+  subgraph Ops[IAM, logging, monitoring and retention]
+  subgraph Process[Processing and orchestration]
+    GKE[GKE worker pods]
+    SM[Secret Manager pseudonym salt]
+    KMS[Cloud KMS CMEK]
+    AR[Artifact Registry image]
+  end
+
+  subgraph Data[Governed storage and analytics]
+    ARCH[Cloud Storage raw archive]
+    BQ[BigQuery partitioned table]
+    DP[Dataplex / Data Catalog]
+  end
+
+  subgraph Ops[Security and operations]
+    IAM[IAM least privilege]
+    LOG[Cloud Logging]
+    MON[Cloud Monitoring alerts]
+    AUD[Cloud Audit Logs / Error Reporting / Trace]
+    RET[BigQuery and GCS retention]
+  end
+
+  APP --> PUB
+  KAG --> PUB
+  RUN --> PUB
+  SCH --> RUN
+  GCSRAW --> DF
+  PUB --> DLP
+  PUB --> GKE
+  PUB --> DLQ
+  DLP --> DF
+  DF --> BQ
+  AR --> GKE
+  SM --> GKE
+  KMS --> PUB
+  KMS --> ARCH
+  KMS --> BQ
+  GKE --> ARCH
+  GKE --> BQ
+  ARCH --> DP
+  BQ --> DP
+  GKE --> LOG
+  LOG --> MON
+  IAM --> GKE
+  AUD --> MON
+  RET --> ARCH
+  RET --> BQ
+```
+
 ## How the backend detects issues
 
 The `data_pipeline.py` worker transforms each raw event into a canonical BigQuery row and adds `quality_flags` for downstream dashboards and alerts:
