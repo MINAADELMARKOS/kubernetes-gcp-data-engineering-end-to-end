@@ -1,27 +1,27 @@
-# VerdaTrace Data Platform
+# GCP End-to-End Data Engineering for EY Use Cases
 
-**VerdaTrace — A GCP-native platform for trusted, governed, and sustainable data pipelines.**
+This repository demonstrates a production-style, end-to-end data engineering pattern on Google Cloud Platform (GCP) for EY-relevant analytics workloads. It combines Terraform-managed cloud infrastructure, Pub/Sub ingestion, a Python worker on Google Kubernetes Engine (GKE), BigQuery storage, and governance controls such as pseudonymisation, retention, logging, and least-privilege IAM.
 
-VerdaTrace is a GCP-native enterprise data platform that receives customer data, validates and governs it, applies privacy controls, archives raw evidence, processes events in the backend, and delivers trusted analytics-ready data to BigQuery and downstream systems.
+## Why this matters for EY
 
-## Platform use cases
+EY teams commonly help clients modernise data platforms while preserving auditability, privacy, and operational resilience. This project applies the architecture to practical use cases that can be demonstrated with public real-world datasets and adapted to client data later:
 
-| Use case | Huge Kaggle dataset for demos | Issues the platform detects |
+| Use case | Public data source | EY business outcome |
 | --- | --- | --- |
-| **Mobility expense assurance** | NYC yellow taxi trip data | High fare per mile, unusual tip ratios, negative/zero distance, duplicate trip identifiers. |
-| **ESG transport emissions reporting** | Supply-chain or logistics shipment data | High estimated CO2e, missing transport category, duplicate shipment/order IDs. |
-| **Retail transaction privacy pipeline** | Multi-category ecommerce behaviour data | Direct identifiers in raw events, missing categories, negative/malformed prices, privacy minimisation gaps. |
+| **Mobility expense assurance** | NYC Taxi & Limousine Commission trip records | Detect unusual fares, route-cost outliers, and policy exceptions in employee travel or mobility spend. |
+| **ESG transport emissions reporting** | NYC TLC trip distance and vehicle-service metadata | Estimate trip-level CO2e and aggregate emissions for sustainability reporting. |
+| **Retail transaction privacy pipeline** | Retail/POS-style JSON events | Ingest customer transactions while applying GDPR-aligned minimisation and pseudonymisation. |
 
-The repository does **not** commit huge Kaggle files. Use `config/kaggle_datasets.yml` and `scripts/kaggle_to_pubsub.py` to download datasets in a GCP environment and stream selected CSV rows into Pub/Sub.
+See [`docs/use_cases.md`](docs/use_cases.md) for detailed use-case definitions, event contracts, and BigQuery analytics examples.
 
 ## Architecture
 
+
 ```mermaid
 flowchart LR
-  subgraph Sources[Customer and Kaggle data sources]
-    APP[Customer apps / POS / mobility systems]
-    KAG[Kaggle CSV loader]
-    RUN[Cloud Run portal and loaders]
+  subgraph Sources[Sources and scheduling]
+    APP[Client apps / POS / mobility systems]
+    RUN[Cloud Run loaders]
     SCH[Cloud Scheduler]
     GCSRAW[Cloud Storage raw files]
   end
@@ -47,6 +47,20 @@ flowchart LR
   end
 
   subgraph Ops[IAM, logging, monitoring and retention]
+  subgraph Process[Processing and orchestration]
+    GKE[GKE worker pods]
+    SM[Secret Manager pseudonym salt]
+    KMS[Cloud KMS CMEK]
+    AR[Artifact Registry image]
+  end
+
+  subgraph Data[Governed storage and analytics]
+    ARCH[Cloud Storage raw archive]
+    BQ[BigQuery partitioned table]
+    DP[Dataplex / Data Catalog]
+  end
+
+  subgraph Ops[Security and operations]
     IAM[IAM least privilege]
     LOG[Cloud Logging]
     MON[Cloud Monitoring alerts]

@@ -24,6 +24,10 @@ def test_transform_event_pseudonymises_identifier_and_drops_raw_id():
 
 
 def test_transform_event_adds_emissions_and_mobility_quality_flags():
+    assert row["quality_flags"] == ""
+
+
+def test_transform_event_adds_emissions_and_quality_flags():
     row = transform_event(
         {
             "trip_id": "trip-1",
@@ -34,6 +38,8 @@ def test_transform_event_adds_emissions_and_mobility_quality_flags():
             "tip_amount": 45,
             "trip_distance": 2,
             "source_dataset": "kaggle_nyc_taxi_trip_duration",
+            "trip_distance": 2,
+            "source_system": "nyc_tlc_trip_records",
         },
         salt="test-salt",
     )
@@ -63,3 +69,4 @@ def test_transform_event_flags_esg_and_duplicate_issues():
     assert row["co2e_kg"] == 121.2
     assert "esg_high_emissions" in row["quality_flags"]
     assert "possible_duplicate_event" in row["quality_flags"]
+    assert row["quality_flags"] == "high_amount_per_mile"
